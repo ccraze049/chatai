@@ -34,11 +34,11 @@ export default function ChatMessage({ role, content }: ChatMessageProps) {
 
   return (
     <div
-      className={`flex gap-2 sm:gap-4 ${isUser ? "justify-end" : "justify-start"}`}
+      className={`flex gap-2 sm:gap-4 w-full ${isUser ? "justify-end" : "justify-start"}`}
       data-testid={`message-${role}`}
     >
-      <div className={`flex gap-2 sm:gap-4 ${isUser ? "flex-row-reverse" : "flex-row"} max-w-[95%] sm:max-w-3xl`}>
-        <div className="flex-shrink-0 w-8">
+      <div className={`flex gap-2 sm:gap-4 ${isUser ? "flex-row-reverse" : "flex-row"} w-full sm:max-w-3xl`}>
+        <div className="flex-shrink-0 w-8 h-8">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
             isUser ? "bg-primary text-primary-foreground" : "bg-muted"
           }`}>
@@ -47,41 +47,44 @@ export default function ChatMessage({ role, content }: ChatMessageProps) {
         </div>
         
         <div
-          className={`rounded-2xl p-3 sm:p-4 overflow-hidden ${
+          className={`rounded-2xl p-3 sm:p-4 min-w-0 ${
             isUser
               ? "bg-primary text-primary-foreground"
               : "bg-muted text-foreground"
           }`}
-          style={{ maxWidth: 'calc(100% - 2.5rem)' }}
+          style={{ flex: '1 1 auto', maxWidth: 'calc(100% - 2.5rem)' }}
         >
-          <div className="prose prose-sm max-w-none dark:prose-invert">
+          <div className="prose prose-sm w-full max-w-none dark:prose-invert [&_*]:max-w-full">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
                 code({ node, inline, className, children, ...props }: any) {
                   const match = /language-(\w+)/.exec(className || "");
                   return !inline && match ? (
-                    <div className="overflow-x-auto w-full -mx-3 sm:-mx-4">
-                      <div className="inline-block min-w-full px-3 sm:px-4">
-                        <SyntaxHighlighter
-                          style={theme === "dark" ? oneDark : oneLight}
-                          language={match[1]}
-                          PreTag="div"
-                          className="!text-[10px] sm:!text-sm !my-2"
-                          wrapLongLines={true}
-                          customStyle={{
-                            margin: 0,
-                            padding: '0.75rem',
-                            borderRadius: '0.5rem',
+                    <div className="overflow-x-auto w-full my-2 -mx-3 sm:-mx-4">
+                      <SyntaxHighlighter
+                        style={theme === "dark" ? oneDark : oneLight}
+                        language={match[1]}
+                        PreTag="div"
+                        wrapLongLines={true}
+                        className="!text-[11px] sm:!text-sm"
+                        customStyle={{
+                          margin: 0,
+                          padding: '0.75rem',
+                          borderRadius: '0.5rem',
+                          maxWidth: '100%',
+                        }}
+                        codeTagProps={{
+                          style: {
                             fontSize: 'inherit',
-                            wordBreak: 'break-all',
-                            whiteSpace: 'pre-wrap',
-                          }}
-                          {...props}
-                        >
-                          {String(children).replace(/\n$/, "")}
-                        </SyntaxHighlighter>
-                      </div>
+                            wordBreak: 'break-word',
+                            overflowWrap: 'anywhere',
+                          }
+                        }}
+                        {...props}
+                      >
+                        {String(children).replace(/\n$/, "")}
+                      </SyntaxHighlighter>
                     </div>
                   ) : (
                     <code className={`${className} ${isUser ? "text-primary-foreground" : ""} break-words text-xs sm:text-sm`} {...props}>
@@ -89,10 +92,10 @@ export default function ChatMessage({ role, content }: ChatMessageProps) {
                     </code>
                   );
                 },
-                p: ({ children }) => <p className="mb-2 last:mb-0 break-words overflow-wrap-anywhere">{children}</p>,
-                ul: ({ children }) => <ul className="mb-2 last:mb-0 ml-4 break-words">{children}</ul>,
-                ol: ({ children }) => <ol className="mb-2 last:mb-0 ml-4 break-words">{children}</ol>,
-                pre: ({ children }) => <div className="w-full overflow-hidden">{children}</div>,
+                p: ({ children }) => <p className="mb-2 last:mb-0 break-words" style={{ overflowWrap: 'anywhere' }}>{children}</p>,
+                ul: ({ children }) => <ul className="mb-2 last:mb-0 ml-4">{children}</ul>,
+                ol: ({ children }) => <ol className="mb-2 last:mb-0 ml-4">{children}</ol>,
+                li: ({ children }) => <li className="break-words" style={{ overflowWrap: 'anywhere' }}>{children}</li>,
               }}
             >
               {content}
