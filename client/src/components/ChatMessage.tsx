@@ -56,6 +56,7 @@ export default function ChatMessage({ role, content }: ChatMessageProps) {
     <div
       className={`flex gap-2 sm:gap-4 w-full ${isUser ? "justify-end" : "justify-start"}`}
       data-testid={`message-${role}`}
+      style={isUser ? { marginLeft: '2%' } : {}}
     >
       <div className={`flex gap-2 sm:gap-4 ${isUser ? "flex-row-reverse" : "flex-row"} w-full sm:max-w-3xl`}>
         <div className="flex-shrink-0 w-8 h-8">
