@@ -5,9 +5,9 @@ import { insertChatSessionSchema, insertMessageSchema } from "@shared/schema";
 import { requireAuth } from "./auth";
 import Groq from "groq-sdk";
 
-const groq = new Groq({
+const groq = process.env.GROQ_API_KEY ? new Groq({
   apiKey: process.env.GROQ_API_KEY,
-});
+}) : null;
 
 // Mode-based model selection for Groq API
 // Chat mode: General conversation with llama-3.3-70b-versatile
@@ -20,6 +20,12 @@ const MODEL_MAP = {
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/chat/completions", async (req, res) => {
     try {
+      if (!groq) {
+        return res.status(503).json({ 
+          error: "AI service not configured. Please add GROQ_API_KEY to enable chat functionality." 
+        });
+      }
+
       const { messages, mode } = req.body;
       
       if (!messages || !Array.isArray(messages)) {

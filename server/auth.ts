@@ -24,32 +24,24 @@ export function registerAuthRoutes(app: Express) {
       const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
       const user = await storage.createUser({ email, passwordHash });
 
-      const otp = generateOtp();
-      const otpHash = await bcrypt.hash(otp, SALT_ROUNDS);
-      const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+      // Auto-verify the user (OTP verification disabled)
+      await storage.markUserVerified(user.id);
 
-      await storage.createEmailVerification({
-        userId: user.id,
-        otpHash,
-        expiresAt,
-      });
-
-      try {
-        await sendOtpEmail(email, otp);
-        console.log(`✅ Signup successful for ${email}, OTP sent`);
-      } catch (emailError: any) {
-        console.error("❌ Failed to send OTP email:", emailError.message);
-        // Delete the user since they can't verify
-        await storage.deleteUser(user.id);
-        return res.status(500).json({ 
-          error: "Failed to send verification email. Please check your email configuration or try again later.",
-          details: emailError.message 
-        });
+      // Create session immediately
+      if (req.session) {
+        req.session.userId = user.id;
+        req.session.userEmail = user.email;
       }
 
+      console.log(`✅ Signup successful for ${email} (auto-verified)`);
+
       res.json({
-        message: "OTP sent to your email",
-        userId: user.id,
+        message: "Account created successfully",
+        user: {
+          id: user.id,
+          email: user.email,
+          isVerified: true,
+        },
       });
     } catch (error: any) {
       console.error("Signup error:", error);
@@ -121,9 +113,7 @@ export function registerAuthRoutes(app: Express) {
         return res.status(401).json({ error: "Invalid email or password" });
       }
 
-      if (!user.isVerified) {
-        return res.status(403).json({ error: "Please verify your email first" });
-      }
+      // Removed email verification check (OTP verification disabled)
 
       const isValidPassword = await bcrypt.compare(password, user.passwordHash);
       if (!isValidPassword) {
