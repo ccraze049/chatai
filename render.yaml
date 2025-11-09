@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: chatai
+    name: thinkdual
     runtime: node
     buildCommand: npm install --include=dev && npm run build
     startCommand: npm run start
