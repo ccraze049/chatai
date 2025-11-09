@@ -31,13 +31,19 @@ const sessionConfig: session.SessionOptions = {
 };
 
 if (process.env.MONGODB_URI) {
-  sessionConfig.store = MongoStore.create({
-    mongoUrl: process.env.MONGODB_URI,
-    touchAfter: 24 * 3600,
-    crypto: {
-      secret: process.env.SESSION_SECRET || "dev-secret-change-in-prod",
-    },
-  });
+  try {
+    sessionConfig.store = MongoStore.create({
+      mongoUrl: process.env.MONGODB_URI,
+      touchAfter: 24 * 3600,
+      crypto: {
+        secret: process.env.SESSION_SECRET || "dev-secret-change-in-prod",
+      },
+    });
+    log("MongoDB session store configured successfully");
+  } catch (error) {
+    log(`Warning: Failed to create MongoDB session store: ${error instanceof Error ? error.message : String(error)}`);
+    log("Falling back to in-memory session store (sessions will not persist across restarts)");
+  }
 }
 
 app.use(session(sessionConfig));
