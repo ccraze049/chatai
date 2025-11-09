@@ -3,7 +3,9 @@ import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useEffect, useState } from "react";
-import { Bot, User } from "lucide-react";
+import { Bot, User, Copy, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 interface ChatMessageProps {
   role: "user" | "assistant";
@@ -12,6 +14,8 @@ interface ChatMessageProps {
 
 export default function ChatMessage({ role, content }: ChatMessageProps) {
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     const isDark = document.documentElement.classList.contains("dark");
@@ -29,6 +33,22 @@ export default function ChatMessage({ role, content }: ChatMessageProps) {
 
     return () => observer.disconnect();
   }, []);
+
+  const handleCopyCode = async (code: string, language: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      toast({
+        description: "Code copied to clipboard!",
+      });
+      setTimeout(() => setCopiedCode(null), 2000);
+    } catch (err) {
+      toast({
+        description: "Failed to copy code",
+        variant: "destructive",
+      });
+    }
+  };
 
   const isUser = role === "user";
 
@@ -60,8 +80,24 @@ export default function ChatMessage({ role, content }: ChatMessageProps) {
               components={{
                 code({ node, inline, className, children, ...props }: any) {
                   const match = /language-(\w+)/.exec(className || "");
+                  const codeString = String(children).replace(/\n$/, "");
+                  const isCopied = copiedCode === codeString;
+                  
                   return !inline && match ? (
-                    <div className="overflow-x-auto w-full my-2 -mx-3 sm:-mx-4">
+                    <div className="relative overflow-x-auto w-full my-2 -mx-3 sm:-mx-4 group">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="absolute top-2 right-2 sm:right-4 h-8 w-8 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => handleCopyCode(codeString, match[1])}
+                        data-testid="button-copy-code"
+                      >
+                        {isCopied ? (
+                          <Check className="h-4 w-4" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </Button>
                       <SyntaxHighlighter
                         style={theme === "dark" ? oneDark : oneLight}
                         language={match[1]}
@@ -71,6 +107,7 @@ export default function ChatMessage({ role, content }: ChatMessageProps) {
                         customStyle={{
                           margin: 0,
                           padding: '0.75rem',
+                          paddingRight: '3rem',
                           borderRadius: '0.5rem',
                           maxWidth: '100%',
                         }}
@@ -83,7 +120,7 @@ export default function ChatMessage({ role, content }: ChatMessageProps) {
                         }}
                         {...props}
                       >
-                        {String(children).replace(/\n$/, "")}
+                        {codeString}
                       </SyntaxHighlighter>
                     </div>
                   ) : (
