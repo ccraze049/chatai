@@ -8,9 +8,12 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
+// Mode-based model selection for Groq API
+// Chat mode: General conversation with llama-3.3-70b-versatile
+// Code mode: Programming tasks with llama-4-maverick (17B params, 128 experts, optimized for coding)
 const MODEL_MAP = {
   chat: "llama-3.3-70b-versatile",
-  code: "llama-3.3-70b-versatile", // Using versatile for now as llama-4-maverick may not be available
+  code: "meta-llama/llama-4-maverick-17b-128e-instruct",
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
