@@ -1,5 +1,9 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
+import MongoStore from "connect-mongo";
+import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
+import { registerAuthRoutes } from "./auth";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
@@ -9,6 +13,47 @@ declare module 'http' {
     rawBody: unknown
   }
 }
+
+if (!process.env.SESSION_SECRET && process.env.NODE_ENV === "production") {
+  throw new Error("SESSION_SECRET environment variable is required in production");
+}
+
+const sessionConfig: session.SessionOptions = {
+  secret: process.env.SESSION_SECRET || "dev-secret-change-in-prod",
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: true,
+    maxAge: 1000 * 60 * 60 * 24 * 7,
+    sameSite: "lax",
+  },
+};
+
+if (process.env.MONGODB_URI) {
+  sessionConfig.store = MongoStore.create({
+    mongoUrl: process.env.MONGODB_URI,
+    touchAfter: 24 * 3600,
+    crypto: {
+      secret: process.env.SESSION_SECRET || "dev-secret-change-in-prod",
+    },
+  });
+}
+
+app.use(session(sessionConfig));
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: "Too many authentication attempts, please try again later",
+});
+
+app.use("/api/auth/signup", authLimiter);
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/verify-otp", authLimiter);
+
 app.use(express.json({
   verify: (req, _res, buf) => {
     req.rawBody = buf;
@@ -47,6 +92,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  registerAuthRoutes(app);
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

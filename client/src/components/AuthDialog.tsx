@@ -39,15 +39,29 @@ export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     setIsLoading(true);
 
     try {
-      // TODO: Implement login API call
-      toast({
-        title: "Login functionality",
-        description: "Login will be implemented soon",
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
       });
-    } catch (error) {
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Login failed");
+      }
+
+      toast({
+        title: "Login successful",
+        description: "Welcome back!",
+      });
+
+      onOpenChange(false);
+      window.location.reload();
+    } catch (error: any) {
       toast({
         title: "Login failed",
-        description: "Please check your credentials and try again",
+        description: error.message || "Please check your credentials and try again",
         variant: "destructive",
       });
     } finally {
@@ -60,16 +74,27 @@ export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     setIsLoading(true);
 
     try {
-      // TODO: Implement signup API call
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: signupEmail, password: signupPassword }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Signup failed");
+      }
+
       toast({
-        title: "Signup functionality",
-        description: "An OTP will be sent to your email",
+        title: "OTP sent",
+        description: "Please check your email for the verification code",
       });
       setShowOtpInput(true);
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Signup failed",
-        description: "Please try again later",
+        description: error.message || "Please try again later",
         variant: "destructive",
       });
     } finally {
@@ -82,15 +107,29 @@ export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     setIsLoading(true);
 
     try {
-      // TODO: Implement OTP verification API call
-      toast({
-        title: "OTP verification",
-        description: "OTP verification will be implemented soon",
+      const response = await fetch("/api/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: signupEmail, otp }),
       });
-    } catch (error) {
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Verification failed");
+      }
+
+      toast({
+        title: "Email verified",
+        description: "Your account has been created successfully!",
+      });
+
+      onOpenChange(false);
+      window.location.reload();
+    } catch (error: any) {
       toast({
         title: "Verification failed",
-        description: "Invalid OTP. Please try again",
+        description: error.message || "Invalid OTP. Please try again",
         variant: "destructive",
       });
     } finally {

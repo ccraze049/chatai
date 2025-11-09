@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertChatSessionSchema, insertMessageSchema } from "@shared/schema";
+import { requireAuth } from "./auth";
 import Groq from "groq-sdk";
 
 const groq = new Groq({
@@ -49,9 +50,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/sessions", async (_req, res) => {
+  app.get("/api/sessions", async (req, res) => {
     try {
-      const sessions = await storage.getAllChatSessions();
+      const userId = req.session?.userId;
+      const sessions = await storage.getAllChatSessions(userId);
       res.json(sessions);
     } catch (error: any) {
       console.error("Error fetching sessions:", error);
@@ -74,7 +76,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/sessions", async (req, res) => {
     try {
-      const validatedData = insertChatSessionSchema.parse(req.body);
+      const userId = req.session?.userId;
+      const validatedData = insertChatSessionSchema.parse({
+        ...req.body,
+        userId: userId || null,
+      });
       const session = await storage.createChatSession(validatedData);
       res.json(session);
     } catch (error: any) {
