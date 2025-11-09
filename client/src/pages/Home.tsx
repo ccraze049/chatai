@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
 import ChatMessage from "@/components/ChatMessage";
 import ChatInput from "@/components/ChatInput";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
 
 type Mode = "chat" | "code";
 
@@ -19,19 +22,30 @@ interface ChatSession {
   title: string;
   mode: Mode;
   createdAt: Date;
-  messages: Message[];
 }
 
 export default function Home() {
   const [mode, setMode] = useState<Mode>("chat");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>();
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
-  const activeSession = sessions.find((s) => s.id === activeSessionId);
+  const { data: sessions = [] } = useQuery<ChatSession[]>({
+    queryKey: ["/api/sessions"],
+  });
+
+  const { data: sessionMessages = [] } = useQuery<Message[]>({
+    queryKey: ["/api/sessions", activeSessionId, "messages"],
+    enabled: !!activeSessionId,
+  });
+
+  useEffect(() => {
+    if (sessionMessages.length > 0) {
+      setMessages(sessionMessages);
+    }
+  }, [sessionMessages]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -42,19 +56,43 @@ export default function Home() {
     }
   }, [messages]);
 
+  const createSessionMutation = useMutation({
+    mutationFn: async (data: { title: string; mode: Mode }) => {
+      const res = await apiRequest("POST", "/api/sessions", data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+    },
+  });
+
+  const createMessageMutation = useMutation({
+    mutationFn: async (data: { sessionId: string; role: string; content: string }) => {
+      const res = await apiRequest("POST", "/api/messages", data);
+      return await res.json();
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", variables.sessionId, "messages"] });
+    },
+  });
+
+  const chatCompletionMutation = useMutation({
+    mutationFn: async (data: { messages: Message[]; mode: Mode }) => {
+      const res = await apiRequest("POST", "/api/chat/completions", data);
+      return await res.json();
+    },
+  });
+
   const handleNewChat = () => {
     setMessages([]);
     setActiveSessionId(undefined);
-    console.log("New chat started");
   };
 
-  const handleSessionClick = (id: string) => {
+  const handleSessionClick = async (id: string) => {
     const session = sessions.find((s) => s.id === id);
     if (session) {
       setActiveSessionId(id);
-      setMessages(session.messages);
       setMode(session.mode);
-      console.log("Switched to session:", id);
     }
   };
 
@@ -65,45 +103,60 @@ export default function Home() {
       content,
     };
 
-    setMessages((prev) => [...prev, userMessage]);
-    setIsLoading(true);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
 
-    setTimeout(() => {
+    try {
+      let currentSessionId = activeSessionId;
+
+      if (!currentSessionId) {
+        const newSession = await createSessionMutation.mutateAsync({
+          title: content.slice(0, 50) + (content.length > 50 ? "..." : ""),
+          mode,
+        });
+        currentSessionId = newSession.id;
+        setActiveSessionId(currentSessionId);
+      }
+
+      await createMessageMutation.mutateAsync({
+        sessionId: currentSessionId!,
+        role: "user",
+        content,
+      });
+
+      const response = await chatCompletionMutation.mutateAsync({
+        messages: updatedMessages,
+        mode,
+      });
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: mode === "chat"
-          ? "I'm a chat assistant powered by llama-3.3-70b-versatile. In the full application, I'll provide natural, factual, context-aware conversations. This is currently a design prototype."
-          : "I'm a code assistant powered by llama-4-maverick. In the full application, I'll help you write, debug, and explain code. This is currently a design prototype.\n\n```javascript\nfunction example() {\n  console.log('Hello, World!');\n}\n```",
+        content: response.content,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
-      setIsLoading(false);
 
-      if (!activeSessionId) {
-        const newSession: ChatSession = {
-          id: Date.now().toString(),
-          title: content.slice(0, 50) + (content.length > 50 ? "..." : ""),
-          mode,
-          createdAt: new Date(),
-          messages: [userMessage, assistantMessage],
-        };
-        setSessions((prev) => [newSession, ...prev]);
-        setActiveSessionId(newSession.id);
-      } else {
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.id === activeSessionId
-              ? { ...s, messages: [...s.messages, userMessage, assistantMessage] }
-              : s
-          )
-        );
-      }
-    }, 1000);
+      await createMessageMutation.mutateAsync({
+        sessionId: currentSessionId!,
+        role: "assistant",
+        content: response.content,
+      });
+    } catch (error: any) {
+      console.error("Error sending message:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
+      setMessages((prev) => prev.filter((m) => m.id !== userMessage.id));
+    }
   };
 
   const placeholder =
     mode === "chat" ? "Ask anything..." : "Write or debug code...";
+
+  const isLoading = chatCompletionMutation.isPending;
 
   return (
     <div className="h-screen flex flex-col">
