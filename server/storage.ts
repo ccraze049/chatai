@@ -239,7 +239,179 @@ export class PostgresStorage implements IStorage {
   }
 }
 
+export class MongoDBStorage implements IStorage {
+  private async getDb() {
+    const { getMongoDb } = await import("./mongodb");
+    return getMongoDb();
+  }
+
+  async getChatSession(id: string): Promise<ChatSession | undefined> {
+    const db = await this.getDb();
+    const { ObjectId } = await import("mongodb");
+    const { mongoChatSessionToChatSession } = await import("./mongodb");
+    
+    try {
+      const session = await db.collection("chatSessions").findOne({ _id: new ObjectId(id) });
+      return session ? mongoChatSessionToChatSession(session as any) : undefined;
+    } catch (error) {
+      return undefined;
+    }
+  }
+
+  async getAllChatSessions(userId?: string): Promise<ChatSession[]> {
+    const db = await this.getDb();
+    const { ObjectId } = await import("mongodb");
+    const { mongoChatSessionToChatSession } = await import("./mongodb");
+    
+    const filter = userId ? { userId: new ObjectId(userId) } : {};
+    const sessions = await db.collection("chatSessions")
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .toArray();
+    
+    return sessions.map(s => mongoChatSessionToChatSession(s as any));
+  }
+
+  async createChatSession(insertSession: InsertChatSession): Promise<ChatSession> {
+    const db = await this.getDb();
+    const { ObjectId } = await import("mongodb");
+    const { mongoChatSessionToChatSession } = await import("./mongodb");
+    
+    const session = {
+      userId: insertSession.userId ? new ObjectId(insertSession.userId) : null,
+      title: insertSession.title,
+      mode: insertSession.mode,
+      createdAt: new Date(),
+    };
+    
+    const result = await db.collection("chatSessions").insertOne(session);
+    return mongoChatSessionToChatSession({ ...session, _id: result.insertedId } as any);
+  }
+
+  async getMessages(sessionId: string): Promise<Message[]> {
+    const db = await this.getDb();
+    const { mongoMessageToMessage } = await import("./mongodb");
+    
+    const messages = await db.collection("messages")
+      .find({ sessionId })
+      .sort({ createdAt: 1 })
+      .toArray();
+    
+    return messages.map(m => mongoMessageToMessage(m as any));
+  }
+
+  async createMessage(insertMessage: InsertMessage): Promise<Message> {
+    const db = await this.getDb();
+    const { mongoMessageToMessage } = await import("./mongodb");
+    
+    const message = {
+      sessionId: insertMessage.sessionId,
+      role: insertMessage.role,
+      content: insertMessage.content,
+      createdAt: new Date(),
+    };
+    
+    const result = await db.collection("messages").insertOne(message);
+    return mongoMessageToMessage({ ...message, _id: result.insertedId } as any);
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const db = await this.getDb();
+    const { mongoUserToUser } = await import("./mongodb");
+    
+    const user = {
+      email: insertUser.email,
+      passwordHash: insertUser.passwordHash,
+      isVerified: false,
+      createdAt: new Date(),
+    };
+    
+    const result = await db.collection("users").insertOne(user);
+    return mongoUserToUser({ ...user, _id: result.insertedId } as any);
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const db = await this.getDb();
+    const { mongoUserToUser } = await import("./mongodb");
+    
+    const user = await db.collection("users").findOne({ email });
+    return user ? mongoUserToUser(user as any) : undefined;
+  }
+
+  async getUserById(id: string): Promise<User | undefined> {
+    const db = await this.getDb();
+    const { ObjectId } = await import("mongodb");
+    const { mongoUserToUser } = await import("./mongodb");
+    
+    try {
+      const user = await db.collection("users").findOne({ _id: new ObjectId(id) });
+      return user ? mongoUserToUser(user as any) : undefined;
+    } catch (error) {
+      return undefined;
+    }
+  }
+
+  async markUserVerified(userId: string): Promise<void> {
+    const db = await this.getDb();
+    const { ObjectId } = await import("mongodb");
+    
+    await db.collection("users").updateOne(
+      { _id: new ObjectId(userId) },
+      { $set: { isVerified: true } }
+    );
+  }
+
+  async createEmailVerification(insertVerification: InsertEmailVerification): Promise<EmailVerification> {
+    const db = await this.getDb();
+    const { ObjectId } = await import("mongodb");
+    const { mongoEmailVerificationToEmailVerification } = await import("./mongodb");
+    
+    const verification = {
+      userId: new ObjectId(insertVerification.userId),
+      otpHash: insertVerification.otpHash,
+      expiresAt: insertVerification.expiresAt,
+      isUsed: false,
+      createdAt: new Date(),
+    };
+    
+    const result = await db.collection("emailVerifications").insertOne(verification);
+    return mongoEmailVerificationToEmailVerification({ ...verification, _id: result.insertedId } as any);
+  }
+
+  async findEmailVerification(userId: string): Promise<EmailVerification | undefined> {
+    const db = await this.getDb();
+    const { ObjectId } = await import("mongodb");
+    const { mongoEmailVerificationToEmailVerification } = await import("./mongodb");
+    
+    try {
+      const verification = await db.collection("emailVerifications")
+        .findOne({
+          userId: new ObjectId(userId),
+          isUsed: false,
+          expiresAt: { $gt: new Date() }
+        });
+      
+      return verification ? mongoEmailVerificationToEmailVerification(verification as any) : undefined;
+    } catch (error) {
+      return undefined;
+    }
+  }
+
+  async markVerificationUsed(verificationId: string): Promise<void> {
+    const db = await this.getDb();
+    const { ObjectId } = await import("mongodb");
+    
+    await db.collection("emailVerifications").updateOne(
+      { _id: new ObjectId(verificationId) },
+      { $set: { isUsed: true } }
+    );
+  }
+}
+
 function createStorage(): IStorage {
+  if (process.env.MONGODB_URI) {
+    return new MongoDBStorage();
+  }
   if (process.env.DATABASE_URL) {
     return new PostgresStorage();
   }
