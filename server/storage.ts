@@ -9,6 +9,7 @@ import {
   type InsertEmailVerification
 } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { getDb } from "./db";
 
 export interface IStorage {
   getChatSession(id: string): Promise<ChatSession | undefined>;
@@ -135,10 +136,9 @@ export class MemStorage implements IStorage {
 }
 
 export class PostgresStorage implements IStorage {
-  private db: ReturnType<typeof import("./db").getDb>;
+  private db: ReturnType<typeof getDb>;
 
   constructor() {
-    const { getDb } = require("./db");
     this.db = getDb();
   }
 

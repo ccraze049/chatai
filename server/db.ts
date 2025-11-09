@@ -1,5 +1,5 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import { Pool } from "@neondatabase/serverless";
 import * as schema from "@shared/schema";
 
 let db: ReturnType<typeof drizzle> | null = null;
@@ -12,7 +12,6 @@ export function getDb() {
 
     const pool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
     });
 
     db = drizzle(pool, { schema });
