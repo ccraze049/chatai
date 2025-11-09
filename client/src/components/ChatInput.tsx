@@ -28,7 +28,7 @@ export default function ChatInput({ onSend, placeholder = "Ask anything...", dis
   };
 
   return (
-    <div className="sticky bottom-0 bg-background px-8 pb-6 pt-4">
+    <div className="sticky bottom-0 bg-background px-4 sm:px-8 pb-4 sm:pb-6 pt-4">
       <form onSubmit={handleSubmit} className="max-w-4xl mx-auto w-full">
         <div className="relative rounded-2xl border shadow-lg bg-background">
           <Textarea
@@ -50,7 +50,7 @@ export default function ChatInput({ onSend, placeholder = "Ask anything...", dis
             <Send className="h-4 w-4" />
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground text-center mt-2">
+        <p className="text-xs text-muted-foreground text-center mt-2 hidden sm:block">
           Press Enter to send, Shift + Enter for new line
         </p>
       </form>

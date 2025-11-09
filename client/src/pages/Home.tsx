@@ -26,7 +26,7 @@ interface ChatSession {
 
 export default function Home() {
   const [mode, setMode] = useState<Mode>("chat");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>();
   const [messages, setMessages] = useState<Message[]>([]);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -86,6 +86,7 @@ export default function Home() {
   const handleNewChat = () => {
     setMessages([]);
     setActiveSessionId(undefined);
+    setIsSidebarOpen(false);
   };
 
   const handleSessionClick = async (id: string) => {
@@ -93,6 +94,7 @@ export default function Home() {
     if (session) {
       setActiveSessionId(id);
       setMode(session.mode);
+      setIsSidebarOpen(false);
     }
   };
 
@@ -171,12 +173,12 @@ export default function Home() {
           onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
         />
         
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           {messages.length === 0 ? (
             <WelcomeScreen mode={mode} />
           ) : (
             <ScrollArea className="flex-1" ref={scrollAreaRef}>
-              <div className="px-8 py-6 space-y-6 max-w-4xl mx-auto w-full">
+              <div className="px-4 sm:px-8 py-6 space-y-6 max-w-4xl mx-auto w-full">
                 {messages.map((message) => (
                   <ChatMessage
                     key={message.id}
