@@ -198,7 +198,7 @@ export default function Home() {
             <WelcomeScreen mode={mode} />
           ) : (
             <ScrollArea className="flex-1" ref={scrollAreaRef}>
-              <div className="px-4 sm:px-8 py-6 space-y-6 max-w-4xl mx-auto w-full">
+              <div className="px-2 sm:px-4 md:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6 max-w-4xl mx-auto w-full">
                 {messages.map((message) => (
                   <ChatMessage
                     key={message.id}
@@ -207,7 +207,7 @@ export default function Home() {
                   />
                 ))}
                 {isLoading && (
-                  <div className="flex gap-4">
+                  <div className="flex gap-2 sm:gap-4">
                     <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
                     <div className="rounded-2xl p-4 bg-muted animate-pulse h-20 w-64" />
                   </div>

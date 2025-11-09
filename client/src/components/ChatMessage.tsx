@@ -34,10 +34,10 @@ export default function ChatMessage({ role, content }: ChatMessageProps) {
 
   return (
     <div
-      className={`flex gap-4 ${isUser ? "justify-end" : "justify-start"}`}
+      className={`flex gap-2 sm:gap-4 ${isUser ? "justify-end" : "justify-start"}`}
       data-testid={`message-${role}`}
     >
-      <div className={`flex gap-4 max-w-3xl ${isUser ? "flex-row-reverse" : "flex-row"}`}>
+      <div className={`flex gap-2 sm:gap-4 max-w-full sm:max-w-3xl ${isUser ? "flex-row-reverse" : "flex-row"}`}>
         <div className="flex-shrink-0">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
             isUser ? "bg-primary text-primary-foreground" : "bg-muted"
@@ -47,35 +47,41 @@ export default function ChatMessage({ role, content }: ChatMessageProps) {
         </div>
         
         <div
-          className={`rounded-2xl p-4 ${
+          className={`rounded-2xl p-3 sm:p-4 min-w-0 flex-1 overflow-hidden ${
             isUser
               ? "bg-primary text-primary-foreground"
               : "bg-muted text-foreground"
           }`}
         >
-          <div className="prose prose-sm max-w-none dark:prose-invert">
+          <div className="prose prose-sm max-w-none dark:prose-invert overflow-x-auto">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
                 code({ node, inline, className, children, ...props }: any) {
                   const match = /language-(\w+)/.exec(className || "");
                   return !inline && match ? (
-                    <SyntaxHighlighter
-                      style={theme === "dark" ? oneDark : oneLight}
-                      language={match[1]}
-                      PreTag="div"
-                      className="rounded-lg !mt-2 !mb-2"
-                      {...props}
-                    >
-                      {String(children).replace(/\n$/, "")}
-                    </SyntaxHighlighter>
+                    <div className="overflow-x-auto -mx-1">
+                      <SyntaxHighlighter
+                        style={theme === "dark" ? oneDark : oneLight}
+                        language={match[1]}
+                        PreTag="div"
+                        className="rounded-lg !mt-2 !mb-2 text-xs sm:text-sm"
+                        customStyle={{
+                          maxWidth: '100%',
+                          overflowX: 'auto',
+                        }}
+                        {...props}
+                      >
+                        {String(children).replace(/\n$/, "")}
+                      </SyntaxHighlighter>
+                    </div>
                   ) : (
-                    <code className={`${className} ${isUser ? "text-primary-foreground" : ""}`} {...props}>
+                    <code className={`${className} ${isUser ? "text-primary-foreground" : ""} break-all`} {...props}>
                       {children}
                     </code>
                   );
                 },
-                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                p: ({ children }) => <p className="mb-2 last:mb-0 break-words">{children}</p>,
                 ul: ({ children }) => <ul className="mb-2 last:mb-0 ml-4">{children}</ul>,
                 ol: ({ children }) => <ol className="mb-2 last:mb-0 ml-4">{children}</ol>,
               }}
