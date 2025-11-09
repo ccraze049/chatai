@@ -34,7 +34,18 @@ export function registerAuthRoutes(app: Express) {
         expiresAt,
       });
 
-      await sendOtpEmail(email, otp);
+      try {
+        await sendOtpEmail(email, otp);
+        console.log(`✅ Signup successful for ${email}, OTP sent`);
+      } catch (emailError: any) {
+        console.error("❌ Failed to send OTP email:", emailError.message);
+        // Delete the user since they can't verify
+        await storage.deleteUser(user.id);
+        return res.status(500).json({ 
+          error: "Failed to send verification email. Please check your email configuration or try again later.",
+          details: emailError.message 
+        });
+      }
 
       res.json({
         message: "OTP sent to your email",

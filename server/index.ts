@@ -8,11 +8,10 @@ import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 
-// Enable trust proxy when behind a reverse proxy (e.g., Render, Heroku)
+// Enable trust proxy when behind a reverse proxy (e.g., Render, Heroku, Replit)
 // This is required for rate limiting and sessions to work properly
-if (process.env.NODE_ENV === "production") {
-  app.set("trust proxy", 1);
-}
+// Always enable in production, and in development if X-Forwarded-For is present
+app.set("trust proxy", 1);
 
 declare module 'http' {
   interface IncomingMessage {

@@ -22,6 +22,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserById(id: string): Promise<User | undefined>;
   markUserVerified(userId: string): Promise<void>;
+  deleteUser(userId: string): Promise<void>;
   
   createEmailVerification(verification: InsertEmailVerification): Promise<EmailVerification>;
   findEmailVerification(userId: string): Promise<EmailVerification | undefined>;
@@ -106,6 +107,16 @@ export class MemStorage implements IStorage {
     const user = this.users.get(userId);
     if (user) {
       this.users.set(userId, { ...user, isVerified: true });
+    }
+  }
+
+  async deleteUser(userId: string): Promise<void> {
+    this.users.delete(userId);
+    // Also delete any email verifications for this user
+    const verifications = Array.from(this.emailVerifications.values())
+      .filter(v => v.userId === userId);
+    for (const v of verifications) {
+      this.emailVerifications.delete(v.id);
     }
   }
 
@@ -211,6 +222,15 @@ export class PostgresStorage implements IStorage {
     const { users } = await import("@shared/schema");
     const { eq } = await import("drizzle-orm");
     await this.db.update(users).set({ isVerified: true }).where(eq(users.id, userId));
+  }
+
+  async deleteUser(userId: string): Promise<void> {
+    const { users, emailVerifications } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    // Delete email verifications first (foreign key constraint)
+    await this.db.delete(emailVerifications).where(eq(emailVerifications.userId, userId));
+    // Then delete the user
+    await this.db.delete(users).where(eq(users.id, userId));
   }
 
   async createEmailVerification(insertVerification: InsertEmailVerification): Promise<EmailVerification> {
@@ -359,6 +379,16 @@ export class MongoDBStorage implements IStorage {
       { _id: new ObjectId(userId) },
       { $set: { isVerified: true } }
     );
+  }
+
+  async deleteUser(userId: string): Promise<void> {
+    const db = await this.getDb();
+    const { ObjectId } = await import("mongodb");
+    
+    // Delete email verifications first
+    await db.collection("emailVerifications").deleteMany({ userId: new ObjectId(userId) });
+    // Then delete the user
+    await db.collection("users").deleteOne({ _id: new ObjectId(userId) });
   }
 
   async createEmailVerification(insertVerification: InsertEmailVerification): Promise<EmailVerification> {
