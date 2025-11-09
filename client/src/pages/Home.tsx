@@ -8,6 +8,7 @@ import ChatInput from "@/components/ChatInput";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile, MOBILE_BREAKPOINT } from "@/hooks/use-mobile";
 
 type Mode = "chat" | "code";
 
@@ -26,11 +27,18 @@ interface ChatSession {
 
 export default function Home() {
   const [mode, setMode] = useState<Mode>("chat");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= MOBILE_BREAKPOINT;
+    }
+    return false;
+  });
+  const [hasUserToggledSidebar, setHasUserToggledSidebar] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>();
   const [messages, setMessages] = useState<Message[]>([]);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const { data: sessions = [] } = useQuery<ChatSession[]>({
     queryKey: ["/api/sessions"],
@@ -55,6 +63,13 @@ export default function Home() {
       }
     }
   }, [messages]);
+
+  useEffect(() => {
+    if (isMobile === undefined) return;
+    if (!hasUserToggledSidebar) {
+      setIsSidebarOpen(!isMobile);
+    }
+  }, [isMobile, hasUserToggledSidebar]);
 
   const createSessionMutation = useMutation({
     mutationFn: async (data: { title: string; mode: Mode }) => {
@@ -87,6 +102,7 @@ export default function Home() {
     setMessages([]);
     setActiveSessionId(undefined);
     setIsSidebarOpen(false);
+    setHasUserToggledSidebar(true);
   };
 
   const handleSessionClick = async (id: string) => {
@@ -95,6 +111,7 @@ export default function Home() {
       setActiveSessionId(id);
       setMode(session.mode);
       setIsSidebarOpen(false);
+      setHasUserToggledSidebar(true);
     }
   };
 
@@ -170,7 +187,10 @@ export default function Home() {
           activeSessionId={activeSessionId}
           onSessionClick={handleSessionClick}
           isOpen={isSidebarOpen}
-          onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+          onToggle={() => {
+            setIsSidebarOpen(!isSidebarOpen);
+            setHasUserToggledSidebar(true);
+          }}
         />
         
         <div className="flex-1 flex flex-col min-w-0">
