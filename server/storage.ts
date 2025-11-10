@@ -6,7 +6,9 @@ import {
   type User,
   type InsertUser,
   type EmailVerification,
-  type InsertEmailVerification
+  type InsertEmailVerification,
+  type ApiKey,
+  type InsertApiKey
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { getDb } from "./db";
@@ -27,6 +29,12 @@ export interface IStorage {
   createEmailVerification(verification: InsertEmailVerification): Promise<EmailVerification>;
   findEmailVerification(userId: string): Promise<EmailVerification | undefined>;
   markVerificationUsed(verificationId: string): Promise<void>;
+  
+  createApiKey(apiKey: InsertApiKey): Promise<ApiKey>;
+  getApiKeysByUserId(userId: string): Promise<ApiKey[]>;
+  getApiKeyByKey(key: string): Promise<ApiKey | undefined>;
+  deleteApiKey(id: string): Promise<void>;
+  updateApiKeyLastUsed(key: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -34,12 +42,14 @@ export class MemStorage implements IStorage {
   private messages: Map<string, Message>;
   private users: Map<string, User>;
   private emailVerifications: Map<string, EmailVerification>;
+  private apiKeys: Map<string, ApiKey>;
 
   constructor() {
     this.chatSessions = new Map();
     this.messages = new Map();
     this.users = new Map();
     this.emailVerifications = new Map();
+    this.apiKeys = new Map();
   }
 
   async getChatSession(id: string): Promise<ChatSession | undefined> {
@@ -142,6 +152,39 @@ export class MemStorage implements IStorage {
     const verification = this.emailVerifications.get(verificationId);
     if (verification) {
       this.emailVerifications.set(verificationId, { ...verification, isUsed: true });
+    }
+  }
+
+  async createApiKey(insertApiKey: InsertApiKey): Promise<ApiKey> {
+    const id = randomUUID();
+    const apiKey: ApiKey = {
+      ...insertApiKey,
+      id,
+      lastUsedAt: null,
+      createdAt: new Date(),
+    };
+    this.apiKeys.set(id, apiKey);
+    return apiKey;
+  }
+
+  async getApiKeysByUserId(userId: string): Promise<ApiKey[]> {
+    return Array.from(this.apiKeys.values())
+      .filter(k => k.userId === userId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async getApiKeyByKey(key: string): Promise<ApiKey | undefined> {
+    return Array.from(this.apiKeys.values()).find(k => k.key === key);
+  }
+
+  async deleteApiKey(id: string): Promise<void> {
+    this.apiKeys.delete(id);
+  }
+
+  async updateApiKeyLastUsed(key: string): Promise<void> {
+    const apiKey = Array.from(this.apiKeys.values()).find(k => k.key === key);
+    if (apiKey) {
+      this.apiKeys.set(apiKey.id, { ...apiKey, lastUsedAt: new Date() });
     }
   }
 }
@@ -256,6 +299,39 @@ export class PostgresStorage implements IStorage {
     const { emailVerifications } = await import("@shared/schema");
     const { eq } = await import("drizzle-orm");
     await this.db.update(emailVerifications).set({ isUsed: true }).where(eq(emailVerifications.id, verificationId));
+  }
+
+  async createApiKey(insertApiKey: InsertApiKey): Promise<ApiKey> {
+    const { apiKeys } = await import("@shared/schema");
+    const result = await this.db.insert(apiKeys).values(insertApiKey).returning();
+    return result[0]!;
+  }
+
+  async getApiKeysByUserId(userId: string): Promise<ApiKey[]> {
+    const { apiKeys } = await import("@shared/schema");
+    const { eq, desc } = await import("drizzle-orm");
+    return this.db.select().from(apiKeys)
+      .where(eq(apiKeys.userId, userId))
+      .orderBy(desc(apiKeys.createdAt));
+  }
+
+  async getApiKeyByKey(key: string): Promise<ApiKey | undefined> {
+    const { apiKeys } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    const result = await this.db.select().from(apiKeys).where(eq(apiKeys.key, key)).limit(1);
+    return result[0];
+  }
+
+  async deleteApiKey(id: string): Promise<void> {
+    const { apiKeys } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    await this.db.delete(apiKeys).where(eq(apiKeys.id, id));
+  }
+
+  async updateApiKeyLastUsed(key: string): Promise<void> {
+    const { apiKeys } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    await this.db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.key, key));
   }
 }
 
@@ -434,6 +510,80 @@ export class MongoDBStorage implements IStorage {
     await db.collection("emailVerifications").updateOne(
       { _id: new ObjectId(verificationId) },
       { $set: { isUsed: true } }
+    );
+  }
+
+  async createApiKey(insertApiKey: InsertApiKey): Promise<ApiKey> {
+    const db = await this.getDb();
+    const { ObjectId } = await import("mongodb");
+    
+    const apiKeyDoc = {
+      userId: new ObjectId(insertApiKey.userId),
+      name: insertApiKey.name,
+      key: insertApiKey.key,
+      lastUsedAt: null,
+      createdAt: new Date(),
+    };
+    
+    const result = await db.collection("apiKeys").insertOne(apiKeyDoc);
+    return {
+      id: result.insertedId.toString(),
+      userId: insertApiKey.userId,
+      name: insertApiKey.name,
+      key: insertApiKey.key,
+      lastUsedAt: null,
+      createdAt: apiKeyDoc.createdAt,
+    };
+  }
+
+  async getApiKeysByUserId(userId: string): Promise<ApiKey[]> {
+    const db = await this.getDb();
+    const { ObjectId } = await import("mongodb");
+    
+    const keys = await db.collection("apiKeys")
+      .find({ userId: new ObjectId(userId) })
+      .sort({ createdAt: -1 })
+      .toArray();
+    
+    return keys.map((k: any) => ({
+      id: k._id.toString(),
+      userId: k.userId.toString(),
+      name: k.name,
+      key: k.key,
+      lastUsedAt: k.lastUsedAt,
+      createdAt: k.createdAt,
+    }));
+  }
+
+  async getApiKeyByKey(key: string): Promise<ApiKey | undefined> {
+    const db = await this.getDb();
+    
+    const apiKey = await db.collection("apiKeys").findOne({ key });
+    if (!apiKey) return undefined;
+    
+    return {
+      id: apiKey._id.toString(),
+      userId: apiKey.userId.toString(),
+      name: apiKey.name,
+      key: apiKey.key,
+      lastUsedAt: apiKey.lastUsedAt,
+      createdAt: apiKey.createdAt,
+    };
+  }
+
+  async deleteApiKey(id: string): Promise<void> {
+    const db = await this.getDb();
+    const { ObjectId } = await import("mongodb");
+    
+    await db.collection("apiKeys").deleteOne({ _id: new ObjectId(id) });
+  }
+
+  async updateApiKeyLastUsed(key: string): Promise<void> {
+    const db = await this.getDb();
+    
+    await db.collection("apiKeys").updateOne(
+      { key },
+      { $set: { lastUsedAt: new Date() } }
     );
   }
 }
