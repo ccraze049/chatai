@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertChatSessionSchema, insertMessageSchema } from "@shared/schema";
 import { requireAuth } from "./auth";
 import Groq from "groq-sdk";
+import { randomBytes } from "crypto";
 
 const groq = process.env.GROQ_API_KEY ? new Groq({
   apiKey: process.env.GROQ_API_KEY,
@@ -113,6 +114,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error creating message:", error);
       res.status(400).json({ error: "Invalid message data", details: error.message });
+    }
+  });
+
+  app.get("/api/keys", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session!.userId;
+      const keys = await storage.getApiKeysByUserId(userId);
+      res.json(keys);
+    } catch (error: any) {
+      console.error("Error fetching API keys:", error);
+      res.status(500).json({ error: "Failed to fetch API keys" });
+    }
+  });
+
+  app.post("/api/keys", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session!.userId;
+      const { name } = req.body;
+      
+      if (!name || typeof name !== "string" || name.trim().length === 0) {
+        return res.status(400).json({ error: "Key name is required" });
+      }
+
+      const key = `sk-${randomBytes(32).toString("hex")}`;
+      
+      const apiKey = await storage.createApiKey({
+        userId,
+        name: name.trim(),
+        key,
+      });
+
+      res.json(apiKey);
+    } catch (error: any) {
+      console.error("Error creating API key:", error);
+      res.status(500).json({ error: "Failed to create API key" });
+    }
+  });
+
+  app.delete("/api/keys/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session!.userId;
+      const keyId = req.params.id;
+      
+      const keys = await storage.getApiKeysByUserId(userId);
+      const keyToDelete = keys.find(k => k.id === keyId);
+      
+      if (!keyToDelete) {
+        return res.status(404).json({ error: "API key not found" });
+      }
+
+      await storage.deleteApiKey(keyId);
+      res.json({ message: "API key deleted successfully" });
+    } catch (error: any) {
+      console.error("Error deleting API key:", error);
+      res.status(500).json({ error: "Failed to delete API key" });
     }
   });
 
