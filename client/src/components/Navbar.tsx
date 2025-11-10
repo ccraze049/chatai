@@ -59,17 +59,17 @@ export default function Navbar({ mode, onModeChange, onNewChat }: NavbarProps) {
   return (
     <>
       <nav className="h-16 border-b backdrop-blur-sm bg-background/80 sticky top-0 z-50">
-        <div className="h-full px-6 flex items-center justify-between">
+        <div className="h-full px-3 sm:px-6 flex items-center justify-between gap-2">
           <ModeToggle mode={mode} onModeChange={onModeChange} />
           
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
             {user ? (
               <>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
                   <User className="h-4 w-4" />
-                  <span className="hidden sm:inline">{user.email}</span>
+                  <span>{user.email}</span>
                 </div>
-                <Link href="/api-keys" data-testid="link-api-keys">
+                <Link href="/api-keys" data-testid="link-api-keys" className="hidden sm:inline-block">
                   <Button
                     variant="ghost"
                     size="default"
@@ -77,10 +77,10 @@ export default function Navbar({ mode, onModeChange, onNewChat }: NavbarProps) {
                     data-testid="button-api-keys"
                   >
                     <Key className="h-4 w-4" />
-                    <span className="hidden sm:inline">API Keys</span>
+                    <span className="hidden lg:inline">API Keys</span>
                   </Button>
                 </Link>
-                <Link href="/docs" data-testid="link-docs">
+                <Link href="/docs" data-testid="link-docs" className="hidden sm:inline-block">
                   <Button
                     variant="ghost"
                     size="default"
@@ -88,15 +88,16 @@ export default function Navbar({ mode, onModeChange, onNewChat }: NavbarProps) {
                     data-testid="button-docs"
                   >
                     <BookOpen className="h-4 w-4" />
-                    <span className="hidden sm:inline">Docs</span>
+                    <span className="hidden lg:inline">Docs</span>
                   </Button>
                 </Link>
                 <Button
                   variant="outline"
                   size="default"
                   onClick={handleLogout}
-                  className="gap-2"
+                  className="gap-1 sm:gap-2"
                   data-testid="button-logout"
+                  aria-label="Logout"
                 >
                   <LogOut className="h-4 w-4" />
                   <span className="hidden sm:inline">Logout</span>
@@ -107,8 +108,9 @@ export default function Navbar({ mode, onModeChange, onNewChat }: NavbarProps) {
                 variant="outline"
                 size="default"
                 onClick={() => setShowAuthDialog(true)}
-                className="gap-2"
+                className="gap-1 sm:gap-2"
                 data-testid="button-login"
+                aria-label="Login"
               >
                 <LogIn className="h-4 w-4" />
                 <span className="hidden sm:inline">Login</span>
@@ -118,8 +120,9 @@ export default function Navbar({ mode, onModeChange, onNewChat }: NavbarProps) {
               variant="outline"
               size="default"
               onClick={onNewChat}
-              className="gap-2"
+              className="gap-1 sm:gap-2"
               data-testid="button-new-chat"
+              aria-label="New Chat"
             >
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">New Chat</span>
