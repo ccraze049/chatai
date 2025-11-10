@@ -10,6 +10,15 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+**November 10, 2025:**
+- Implemented complete API key management system similar to Google's API keys
+- Added secure API key generation with bcrypt hashing (keys shown only once at creation)
+- Created API keys management page for creating, viewing, and deleting keys
+- Built comprehensive API documentation page with usage examples
+- Added dual authentication support: session-based (UI) and API key-based (programmatic)
+- Updated all storage implementations to support API key CRUD operations
+- API keys use format "sk-{random-hex}" and are hashed before storage with keyPrefix for display
+
 **November 9, 2025:**
 - Implemented complete authentication system with MongoDB Atlas and Gmail OTP
 - Added user signup, login, email verification (OTP), and logout functionality
@@ -40,10 +49,12 @@ Preferred communication style: Simple, everyday language.
 
 **Security Features:**
 - Passwords hashed using bcrypt (10 salt rounds)
+- API keys hashed using bcrypt before storage (10 salt rounds)
 - OTP codes hashed before storage
 - Session-based authentication with secure cookies
 - Email verification required before login
 - OTP expiration (10 minutes)
+- API keys shown only once at creation (never exposed again)
 - MongoDB indexes for performance and TTL for automatic cleanup
 
 ### Frontend Architecture
@@ -67,7 +78,7 @@ Preferred communication style: Simple, everyday language.
 - Custom color system using HSL values for theme flexibility
 
 **Key Components:**
-- Navbar: Fixed header with mode toggle, new chat button, and authentication (login/logout, user email display)
+- Navbar: Fixed header with mode toggle, new chat button, and authentication (login/logout, user email display, API keys link)
 - AuthDialog: Modal dialog for login/signup with OTP verification flow
 - Sidebar: Collapsible session history with toggle functionality
 - ChatMessage: Markdown rendering with syntax highlighting (react-markdown, remark-gfm, react-syntax-highlighter)
@@ -75,6 +86,8 @@ Preferred communication style: Simple, everyday language.
 - WelcomeScreen: Initial landing state with mode-specific examples
 - ModeToggle: Chat/Code mode switcher with visual feedback
 - ThemeToggle: Light/dark theme switcher with localStorage persistence
+- ApiKeys: Page for managing API keys with create/delete functionality
+- Documentation: Comprehensive API documentation with code examples
 
 ### Backend Architecture
 
@@ -102,6 +115,12 @@ Preferred communication style: Simple, everyday language.
 - `POST /api/auth/logout` - End user session
 - `GET /api/auth/me` - Get current user information
 
+**API Key Endpoints:**
+- `GET /api/keys` - List all API keys for current user (requires session auth)
+- `POST /api/keys` - Create new API key (requires session auth, returns full key once)
+- `DELETE /api/keys/:id` - Delete an API key (requires session auth)
+- All chat endpoints support both session-based and API key-based authentication
+
 **Development Environment:**
 - Vite dev server integration for HMR (Hot Module Replacement)
 - Custom middleware mode for API/static file serving
@@ -126,18 +145,21 @@ Preferred communication style: Simple, everyday language.
 - `emailVerifications` collection: _id (ObjectId), userId (ObjectId ref), otpHash, expiresAt, isUsed, createdAt
 - `chatSessions` collection: _id (ObjectId), userId (ObjectId ref), title, mode, createdAt
 - `messages` collection: _id (ObjectId), sessionId (string), role, content, createdAt
+- `apiKeys` collection: _id (ObjectId), userId (ObjectId ref), name, keyHash, keyPrefix, lastUsedAt, createdAt
 
 **Indexes:**
 - users.email (unique)
 - emailVerifications.userId, emailVerifications.expiresAt (TTL)
 - chatSessions.userId, chatSessions.createdAt
 - messages.sessionId, messages.createdAt
+- apiKeys.userId, apiKeys.createdAt, apiKeys.keyHash (unique)
 
 **Data Models:**
 - User: User account with email and hashed password
 - EmailVerification: OTP verification records with expiration
 - ChatSession: Conversation with user relationship
 - Message: Individual messages within sessions
+- ApiKey: User API keys with hashed key and prefix for secure programmatic access
 
 ### External Dependencies
 
@@ -198,9 +220,37 @@ Required for full functionality:
 - `GMAIL_APP_PASSWORD` - Gmail app password (not regular password)
 - `SESSION_SECRET` (optional) - Secret for session encryption (defaults to development key)
 
+## API Key Management
+
+The application includes a complete API key management system inspired by Google's API keys:
+
+**Features:**
+- Users can create multiple named API keys for programmatic access
+- Keys use the format "sk-{64-char-random-hex}" for easy identification
+- Full key is shown only once at creation time for security
+- Keys are bcrypt-hashed before storage (never stored in plain text)
+- Only keyPrefix (first 12 characters) is stored for display purposes
+- Users can view all their keys (with prefixes) and delete them
+- API keys can be used with `Authorization: Bearer <key>` header
+- Dual authentication: session-based for UI, API key for programmatic access
+- Last used timestamp tracking for each key
+
+**Security Implementation:**
+- Keys are hashed using bcrypt (same as passwords) before storage
+- Validation compares incoming key hash against stored hashes
+- No copy button available for existing keys (prevents accidental exposure)
+- Frontend never receives full keys after creation
+- Keys are user-specific and cannot access other users' data
+
+**Performance Considerations:**
+- Current implementation scans all keys for validation (MVP acceptable)
+- For production scale, implement indexed lookup by keyPrefix or UUID
+- Consider caching frequently used keys to reduce bcrypt overhead
+
 ## Notes
 
 - Resend email integration was proposed but user declined. Using Gmail with Nodemailer instead.
 - The application previously had a DATABASE_URL pointing to Neon, but MongoDB Atlas is now the primary database.
 - All chat sessions and messages are now user-specific when authenticated.
 - Guest users (not logged in) can still use the chat, but their sessions are not persisted or linked to their account.
+- API key feature added November 10, 2025, implementing secure key management similar to major cloud providers.
