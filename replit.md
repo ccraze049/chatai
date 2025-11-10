@@ -11,13 +11,28 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 **November 10, 2025:**
-- Implemented complete API key management system similar to Google's API keys
-- Added secure API key generation with bcrypt hashing (keys shown only once at creation)
-- Created API keys management page for creating, viewing, and deleting keys
-- Built comprehensive API documentation page with usage examples
-- Added dual authentication support: session-based (UI) and API key-based (programmatic)
-- Updated all storage implementations to support API key CRUD operations
-- API keys use format "sk-{random-hex}" and are hashed before storage with keyPrefix for display
+- **Mobile Responsiveness Optimization:**
+  - Implemented comprehensive mobile UX improvements for 320-768px screens
+  - Added custom xs breakpoint (480px) for very small devices (320-360px)
+  - Optimized ModeToggle: Icon-only display on mobile with responsive sizing
+  - Enhanced WelcomeScreen: Responsive typography, spacing, and icons
+  - Improved Navbar: Responsive padding/gaps, mobile-friendly controls
+  - Enhanced Sidebar: Mobile overlay with backdrop, API Keys/Docs links for mobile users
+  - Replaced all emojis with lucide-react icons per design guidelines
+  - Removed hover effects from non-interactive elements for better touch experience
+- **Accessibility Improvements:**
+  - Implemented complete focus management for Sidebar modal overlay
+  - Added ARIA semantics: role="dialog", aria-modal, aria-labels
+  - Keyboard navigation: Tab trapping on mobile, Escape closes sidebar
+  - Focus restoration: Returns focus to trigger button when closing
+- **API Key Management:**
+  - Implemented complete API key management system similar to Google's API keys
+  - Added secure API key generation with bcrypt hashing (keys shown only once at creation)
+  - Created API keys management page for creating, viewing, and deleting keys
+  - Built comprehensive API documentation page with usage examples
+  - Added dual authentication support: session-based (UI) and API key-based (programmatic)
+  - Updated all storage implementations to support API key CRUD operations
+  - API keys use format "sk-{random-hex}" and are hashed before storage with keyPrefix for display
 
 **November 9, 2025:**
 - Implemented complete authentication system with MongoDB Atlas and Gmail OTP
