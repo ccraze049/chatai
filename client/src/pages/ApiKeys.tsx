@@ -21,9 +21,13 @@ import { Link } from "wouter";
 interface ApiKey {
   id: string;
   name: string;
-  key: string;
+  keyPrefix: string;
   createdAt: string;
   lastUsedAt: string | null;
+}
+
+interface NewlyCreatedApiKey extends ApiKey {
+  key: string;
 }
 
 export default function ApiKeys() {
@@ -39,7 +43,7 @@ export default function ApiKeys() {
   const createKeyMutation = useMutation({
     mutationFn: async (name: string) => {
       const res = await apiRequest("POST", "/api/keys", { name });
-      return await res.json();
+      return await res.json() as NewlyCreatedApiKey;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/keys"] });
@@ -102,8 +106,8 @@ export default function ApiKeys() {
     });
   };
 
-  const maskKey = (key: string) => {
-    return `${key.substring(0, 8)}...${key.substring(key.length - 4)}`;
+  const displayKey = (keyPrefix: string) => {
+    return `${keyPrefix}••••••••`;
   };
 
   return (
@@ -241,7 +245,7 @@ export default function ApiKeys() {
                       </CardTitle>
                       <CardDescription className="flex items-center gap-2 flex-wrap">
                         <code className="text-xs" data-testid={`text-key-masked-${key.id}`}>
-                          {maskKey(key.key)}
+                          {displayKey(key.keyPrefix)}
                         </code>
                         <span>•</span>
                         <span>Created {formatDate(key.createdAt)}</span>
@@ -254,14 +258,6 @@ export default function ApiKeys() {
                       </CardDescription>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        onClick={() => copyToClipboard(key.key)}
-                        data-testid={`button-copy-${key.id}`}
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Button>
                       <Button
                         size="icon"
                         variant="outline"

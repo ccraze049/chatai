@@ -2,9 +2,10 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertChatSessionSchema, insertMessageSchema } from "@shared/schema";
-import { requireAuth } from "./auth";
+import { requireAuth, requireAuthOrApiKey } from "./auth";
 import Groq from "groq-sdk";
 import { randomBytes } from "crypto";
+import bcrypt from "bcrypt";
 
 const groq = process.env.GROQ_API_KEY ? new Groq({
   apiKey: process.env.GROQ_API_KEY,
@@ -19,7 +20,7 @@ const MODEL_MAP = {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  app.post("/api/chat/completions", async (req, res) => {
+  app.post("/api/chat/completions", requireAuthOrApiKey, async (req, res) => {
     try {
       if (!groq) {
         return res.status(503).json({ 
@@ -119,9 +120,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/keys", requireAuth, async (req, res) => {
     try {
-      const userId = req.session!.userId;
+      const userId = req.session!.userId!;
       const keys = await storage.getApiKeysByUserId(userId);
-      res.json(keys);
+      const safeKeys = keys.map(({ keyHash, ...rest }) => rest);
+      res.json(safeKeys);
     } catch (error: any) {
       console.error("Error fetching API keys:", error);
       res.status(500).json({ error: "Failed to fetch API keys" });
@@ -130,7 +132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/keys", requireAuth, async (req, res) => {
     try {
-      const userId = req.session!.userId;
+      const userId = req.session!.userId!;
       const { name } = req.body;
       
       if (!name || typeof name !== "string" || name.trim().length === 0) {
@@ -138,14 +140,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const key = `sk-${randomBytes(32).toString("hex")}`;
+      const keyHash = await bcrypt.hash(key, 10);
+      const keyPrefix = key.substring(0, 12);
       
       const apiKey = await storage.createApiKey({
         userId,
         name: name.trim(),
-        key,
+        keyHash,
+        keyPrefix,
       });
 
-      res.json(apiKey);
+      res.json({ ...apiKey, key });
     } catch (error: any) {
       console.error("Error creating API key:", error);
       res.status(500).json({ error: "Failed to create API key" });
@@ -154,7 +159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/keys/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.session!.userId;
+      const userId = req.session!.userId!;
       const keyId = req.params.id;
       
       const keys = await storage.getApiKeysByUserId(userId);

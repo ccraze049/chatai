@@ -185,6 +185,64 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+export async function requireApiKey(req: Request, res: Response, next: NextFunction) {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "API key required. Use: Authorization: Bearer <your-api-key>" });
+  }
+
+  const apiKey = authHeader.substring(7);
+  
+  try {
+    const allKeys = await storage.getAllApiKeys();
+    
+    let matchedKey = null;
+    for (const key of allKeys) {
+      const isMatch = await bcrypt.compare(apiKey, key.keyHash);
+      if (isMatch) {
+        matchedKey = key;
+        break;
+      }
+    }
+    
+    if (!matchedKey) {
+      return res.status(401).json({ error: "Invalid API key" });
+    }
+
+    await storage.updateApiKeyLastUsed(matchedKey.keyHash);
+
+    const user = await storage.getUserById(matchedKey.userId);
+    if (!user) {
+      return res.status(401).json({ error: "Invalid API key" });
+    }
+
+    req.session = req.session || {} as any;
+    req.session.userId = user.id;
+    req.session.userEmail = user.email;
+
+    next();
+  } catch (error) {
+    console.error("API key validation error:", error);
+    return res.status(500).json({ error: "Failed to validate API key" });
+  }
+}
+
+export async function requireAuthOrApiKey(req: Request, res: Response, next: NextFunction) {
+  if (req.session?.userId) {
+    return next();
+  }
+
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    return requireApiKey(req, res, next);
+  }
+
+  return res.status(401).json({ 
+    error: "Authentication required. Login via session or provide API key using: Authorization: Bearer <your-api-key>" 
+  });
+}
+
 declare module "express-session" {
   interface SessionData {
     userId: string;

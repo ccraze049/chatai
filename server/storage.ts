@@ -32,9 +32,10 @@ export interface IStorage {
   
   createApiKey(apiKey: InsertApiKey): Promise<ApiKey>;
   getApiKeysByUserId(userId: string): Promise<ApiKey[]>;
-  getApiKeyByKey(key: string): Promise<ApiKey | undefined>;
+  getAllApiKeys(): Promise<ApiKey[]>;
+  getApiKeyByKeyHash(keyHash: string): Promise<ApiKey | undefined>;
   deleteApiKey(id: string): Promise<void>;
-  updateApiKeyLastUsed(key: string): Promise<void>;
+  updateApiKeyLastUsed(keyHash: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -173,16 +174,20 @@ export class MemStorage implements IStorage {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
-  async getApiKeyByKey(key: string): Promise<ApiKey | undefined> {
-    return Array.from(this.apiKeys.values()).find(k => k.key === key);
+  async getAllApiKeys(): Promise<ApiKey[]> {
+    return Array.from(this.apiKeys.values());
+  }
+
+  async getApiKeyByKeyHash(keyHash: string): Promise<ApiKey | undefined> {
+    return Array.from(this.apiKeys.values()).find(k => k.keyHash === keyHash);
   }
 
   async deleteApiKey(id: string): Promise<void> {
     this.apiKeys.delete(id);
   }
 
-  async updateApiKeyLastUsed(key: string): Promise<void> {
-    const apiKey = Array.from(this.apiKeys.values()).find(k => k.key === key);
+  async updateApiKeyLastUsed(keyHash: string): Promise<void> {
+    const apiKey = Array.from(this.apiKeys.values()).find(k => k.keyHash === keyHash);
     if (apiKey) {
       this.apiKeys.set(apiKey.id, { ...apiKey, lastUsedAt: new Date() });
     }
@@ -315,10 +320,16 @@ export class PostgresStorage implements IStorage {
       .orderBy(desc(apiKeys.createdAt));
   }
 
-  async getApiKeyByKey(key: string): Promise<ApiKey | undefined> {
+  async getAllApiKeys(): Promise<ApiKey[]> {
+    const { apiKeys } = await import("@shared/schema");
+    const { desc } = await import("drizzle-orm");
+    return this.db.select().from(apiKeys).orderBy(desc(apiKeys.createdAt));
+  }
+
+  async getApiKeyByKeyHash(keyHash: string): Promise<ApiKey | undefined> {
     const { apiKeys } = await import("@shared/schema");
     const { eq } = await import("drizzle-orm");
-    const result = await this.db.select().from(apiKeys).where(eq(apiKeys.key, key)).limit(1);
+    const result = await this.db.select().from(apiKeys).where(eq(apiKeys.keyHash, keyHash)).limit(1);
     return result[0];
   }
 
@@ -328,10 +339,10 @@ export class PostgresStorage implements IStorage {
     await this.db.delete(apiKeys).where(eq(apiKeys.id, id));
   }
 
-  async updateApiKeyLastUsed(key: string): Promise<void> {
+  async updateApiKeyLastUsed(keyHash: string): Promise<void> {
     const { apiKeys } = await import("@shared/schema");
     const { eq } = await import("drizzle-orm");
-    await this.db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.key, key));
+    await this.db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.keyHash, keyHash));
   }
 }
 
@@ -520,7 +531,8 @@ export class MongoDBStorage implements IStorage {
     const apiKeyDoc = {
       userId: new ObjectId(insertApiKey.userId),
       name: insertApiKey.name,
-      key: insertApiKey.key,
+      keyHash: insertApiKey.keyHash,
+      keyPrefix: insertApiKey.keyPrefix,
       lastUsedAt: null,
       createdAt: new Date(),
     };
@@ -530,7 +542,8 @@ export class MongoDBStorage implements IStorage {
       id: result.insertedId.toString(),
       userId: insertApiKey.userId,
       name: insertApiKey.name,
-      key: insertApiKey.key,
+      keyHash: insertApiKey.keyHash,
+      keyPrefix: insertApiKey.keyPrefix,
       lastUsedAt: null,
       createdAt: apiKeyDoc.createdAt,
     };
@@ -549,23 +562,44 @@ export class MongoDBStorage implements IStorage {
       id: k._id.toString(),
       userId: k.userId.toString(),
       name: k.name,
-      key: k.key,
+      keyHash: k.keyHash,
+      keyPrefix: k.keyPrefix,
       lastUsedAt: k.lastUsedAt,
       createdAt: k.createdAt,
     }));
   }
 
-  async getApiKeyByKey(key: string): Promise<ApiKey | undefined> {
+  async getAllApiKeys(): Promise<ApiKey[]> {
     const db = await this.getDb();
     
-    const apiKey = await db.collection("apiKeys").findOne({ key });
+    const keys = await db.collection("apiKeys")
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
+    
+    return keys.map((k: any) => ({
+      id: k._id.toString(),
+      userId: k.userId.toString(),
+      name: k.name,
+      keyHash: k.keyHash,
+      keyPrefix: k.keyPrefix,
+      lastUsedAt: k.lastUsedAt,
+      createdAt: k.createdAt,
+    }));
+  }
+
+  async getApiKeyByKeyHash(keyHash: string): Promise<ApiKey | undefined> {
+    const db = await this.getDb();
+    
+    const apiKey = await db.collection("apiKeys").findOne({ keyHash });
     if (!apiKey) return undefined;
     
     return {
       id: apiKey._id.toString(),
       userId: apiKey.userId.toString(),
       name: apiKey.name,
-      key: apiKey.key,
+      keyHash: apiKey.keyHash,
+      keyPrefix: apiKey.keyPrefix,
       lastUsedAt: apiKey.lastUsedAt,
       createdAt: apiKey.createdAt,
     };
@@ -578,11 +612,11 @@ export class MongoDBStorage implements IStorage {
     await db.collection("apiKeys").deleteOne({ _id: new ObjectId(id) });
   }
 
-  async updateApiKeyLastUsed(key: string): Promise<void> {
+  async updateApiKeyLastUsed(keyHash: string): Promise<void> {
     const db = await this.getDb();
     
     await db.collection("apiKeys").updateOne(
-      { key },
+      { keyHash },
       { $set: { lastUsedAt: new Date() } }
     );
   }
