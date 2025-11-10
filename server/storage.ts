@@ -59,7 +59,9 @@ export class MemStorage implements IStorage {
 
   async getAllChatSessions(userId?: string): Promise<ChatSession[]> {
     const sessions = Array.from(this.chatSessions.values());
-    const filtered = userId ? sessions.filter(s => s.userId === userId) : sessions;
+    const filtered = userId 
+      ? sessions.filter(s => s.userId === userId)
+      : sessions.filter(s => s.userId === null);
     return filtered.sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
@@ -210,7 +212,7 @@ export class PostgresStorage implements IStorage {
 
   async getAllChatSessions(userId?: string): Promise<ChatSession[]> {
     const { chatSessions } = await import("@shared/schema");
-    const { eq, desc } = await import("drizzle-orm");
+    const { eq, desc, isNull } = await import("drizzle-orm");
     
     if (userId) {
       return this.db.select().from(chatSessions)
@@ -219,6 +221,7 @@ export class PostgresStorage implements IStorage {
     }
     
     return this.db.select().from(chatSessions)
+      .where(isNull(chatSessions.userId))
       .orderBy(desc(chatSessions.createdAt));
   }
 
@@ -370,7 +373,7 @@ export class MongoDBStorage implements IStorage {
     const { ObjectId } = await import("mongodb");
     const { mongoChatSessionToChatSession } = await import("./mongodb");
     
-    const filter = userId ? { userId: new ObjectId(userId) } : {};
+    const filter = userId ? { userId: new ObjectId(userId) } : { userId: null };
     const sessions = await db.collection("chatSessions")
       .find(filter)
       .sort({ createdAt: -1 })
