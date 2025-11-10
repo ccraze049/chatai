@@ -61,7 +61,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/sessions", async (req, res) => {
     try {
       const userId = req.session?.userId;
-      const sessions = await storage.getAllChatSessions(userId);
+      const anonymousSessionId = req.query.anonymousSessionId as string | undefined;
+      const sessions = await storage.getAllChatSessions(userId, anonymousSessionId);
       res.json(sessions);
     } catch (error: any) {
       console.error("Error fetching sessions:", error);

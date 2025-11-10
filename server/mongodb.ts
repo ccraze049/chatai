@@ -36,6 +36,7 @@ async function createIndexes(db: Db) {
   await db.collection("emailVerifications").createIndex({ userId: 1 });
   await db.collection("emailVerifications").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
   await db.collection("chatSessions").createIndex({ userId: 1 });
+  await db.collection("chatSessions").createIndex({ anonymousSessionId: 1 });
   await db.collection("chatSessions").createIndex({ createdAt: -1 });
   await db.collection("messages").createIndex({ sessionId: 1 });
   await db.collection("messages").createIndex({ createdAt: 1 });
@@ -46,9 +47,10 @@ export interface MongoUser extends Omit<User, 'id' | 'createdAt'> {
   createdAt: Date;
 }
 
-export interface MongoChatSession extends Omit<ChatSession, 'id' | 'createdAt' | 'userId'> {
+export interface MongoChatSession extends Omit<ChatSession, 'id' | 'createdAt' | 'userId' | 'anonymousSessionId'> {
   _id: ObjectId;
   userId: ObjectId | null;
+  anonymousSessionId: string | null;
   createdAt: Date;
 }
 
@@ -79,6 +81,7 @@ export function mongoChatSessionToChatSession(mongoSession: MongoChatSession): C
   return {
     id: mongoSession._id.toString(),
     userId: mongoSession.userId?.toString() || null,
+    anonymousSessionId: mongoSession.anonymousSessionId || null,
     title: mongoSession.title,
     mode: mongoSession.mode,
     createdAt: mongoSession.createdAt,

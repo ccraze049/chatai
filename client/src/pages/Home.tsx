@@ -9,6 +9,7 @@ import WelcomeScreen from "@/components/WelcomeScreen";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile, MOBILE_BREAKPOINT } from "@/hooks/use-mobile";
+import { getAnonymousSessionId } from "@/lib/anonymousSession";
 
 type Mode = "chat" | "code";
 
@@ -40,8 +41,15 @@ export default function Home() {
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
+  const anonymousSessionId = getAnonymousSessionId();
+  
   const { data: sessions = [] } = useQuery<ChatSession[]>({
-    queryKey: ["/api/sessions"],
+    queryKey: ["/api/sessions", anonymousSessionId],
+    queryFn: async () => {
+      const res = await fetch(`/api/sessions?anonymousSessionId=${anonymousSessionId}`);
+      if (!res.ok) throw new Error('Failed to fetch sessions');
+      return res.json();
+    },
   });
 
   const { data: sessionMessages = [] } = useQuery<Message[]>({
@@ -73,7 +81,11 @@ export default function Home() {
 
   const createSessionMutation = useMutation({
     mutationFn: async (data: { title: string; mode: Mode }) => {
-      const res = await apiRequest("POST", "/api/sessions", data);
+      const anonymousSessionId = getAnonymousSessionId();
+      const res = await apiRequest("POST", "/api/sessions", {
+        ...data,
+        anonymousSessionId,
+      });
       return await res.json();
     },
     onSuccess: () => {

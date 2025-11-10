@@ -15,7 +15,7 @@ import { getDb } from "./db";
 
 export interface IStorage {
   getChatSession(id: string): Promise<ChatSession | undefined>;
-  getAllChatSessions(userId?: string): Promise<ChatSession[]>;
+  getAllChatSessions(userId?: string, anonymousSessionId?: string): Promise<ChatSession[]>;
   createChatSession(session: InsertChatSession): Promise<ChatSession>;
   getMessages(sessionId: string): Promise<Message[]>;
   createMessage(message: InsertMessage): Promise<Message>;
@@ -57,11 +57,11 @@ export class MemStorage implements IStorage {
     return this.chatSessions.get(id);
   }
 
-  async getAllChatSessions(userId?: string): Promise<ChatSession[]> {
+  async getAllChatSessions(userId?: string, anonymousSessionId?: string): Promise<ChatSession[]> {
     const sessions = Array.from(this.chatSessions.values());
     const filtered = userId 
       ? sessions.filter(s => s.userId === userId)
-      : sessions.filter(s => s.userId === null);
+      : sessions.filter(s => s.userId === null && s.anonymousSessionId === anonymousSessionId);
     return filtered.sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
@@ -72,6 +72,7 @@ export class MemStorage implements IStorage {
     const session: ChatSession = {
       ...insertSession,
       userId: insertSession.userId ?? null,
+      anonymousSessionId: insertSession.anonymousSessionId ?? null,
       id,
       createdAt: new Date(),
     };
@@ -210,9 +211,9 @@ export class PostgresStorage implements IStorage {
     return result[0];
   }
 
-  async getAllChatSessions(userId?: string): Promise<ChatSession[]> {
+  async getAllChatSessions(userId?: string, anonymousSessionId?: string): Promise<ChatSession[]> {
     const { chatSessions } = await import("@shared/schema");
-    const { eq, desc, isNull } = await import("drizzle-orm");
+    const { eq, desc, isNull, and } = await import("drizzle-orm");
     
     if (userId) {
       return this.db.select().from(chatSessions)
@@ -221,7 +222,10 @@ export class PostgresStorage implements IStorage {
     }
     
     return this.db.select().from(chatSessions)
-      .where(isNull(chatSessions.userId))
+      .where(and(
+        isNull(chatSessions.userId),
+        anonymousSessionId ? eq(chatSessions.anonymousSessionId, anonymousSessionId) : isNull(chatSessions.anonymousSessionId)
+      ))
       .orderBy(desc(chatSessions.createdAt));
   }
 
@@ -368,12 +372,14 @@ export class MongoDBStorage implements IStorage {
     }
   }
 
-  async getAllChatSessions(userId?: string): Promise<ChatSession[]> {
+  async getAllChatSessions(userId?: string, anonymousSessionId?: string): Promise<ChatSession[]> {
     const db = await this.getDb();
     const { ObjectId } = await import("mongodb");
     const { mongoChatSessionToChatSession } = await import("./mongodb");
     
-    const filter = userId ? { userId: new ObjectId(userId) } : { userId: null };
+    const filter = userId 
+      ? { userId: new ObjectId(userId) }
+      : { userId: null, anonymousSessionId: anonymousSessionId || null };
     const sessions = await db.collection("chatSessions")
       .find(filter)
       .sort({ createdAt: -1 })
@@ -389,6 +395,7 @@ export class MongoDBStorage implements IStorage {
     
     const session = {
       userId: insertSession.userId ? new ObjectId(insertSession.userId) : null,
+      anonymousSessionId: insertSession.anonymousSessionId || null,
       title: insertSession.title,
       mode: insertSession.mode,
       createdAt: new Date(),

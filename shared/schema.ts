@@ -23,6 +23,7 @@ export const emailVerifications = pgTable("email_verifications", {
 export const chatSessions = pgTable("chat_sessions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  anonymousSessionId: text("anonymous_session_id"),
   title: text("title").notNull(),
   mode: text("mode").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
