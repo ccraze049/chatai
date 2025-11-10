@@ -238,9 +238,7 @@ export async function requireAuthOrApiKey(req: Request, res: Response, next: Nex
     return requireApiKey(req, res, next);
   }
 
-  return res.status(401).json({ 
-    error: "Authentication required. Login via session or provide API key using: Authorization: Bearer <your-api-key>" 
-  });
+  next();
 }
 
 declare module "express-session" {
