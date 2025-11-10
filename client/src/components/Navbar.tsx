@@ -1,10 +1,11 @@
-import { Plus, LogIn, LogOut, User } from "lucide-react";
+import { Plus, LogIn, LogOut, User, Key, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ModeToggle from "./ModeToggle";
 import ThemeToggle from "./ThemeToggle";
 import { useState, useEffect } from "react";
 import AuthDialog from "./AuthDialog";
 import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
 
 type Mode = "chat" | "code";
 
@@ -61,13 +62,35 @@ export default function Navbar({ mode, onModeChange, onNewChat }: NavbarProps) {
         <div className="h-full px-6 flex items-center justify-between">
           <ModeToggle mode={mode} onModeChange={onModeChange} />
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {user ? (
               <>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <User className="h-4 w-4" />
                   <span className="hidden sm:inline">{user.email}</span>
                 </div>
+                <Link href="/api-keys" data-testid="link-api-keys">
+                  <Button
+                    variant="ghost"
+                    size="default"
+                    className="gap-2"
+                    data-testid="button-api-keys"
+                  >
+                    <Key className="h-4 w-4" />
+                    <span className="hidden sm:inline">API Keys</span>
+                  </Button>
+                </Link>
+                <Link href="/docs" data-testid="link-docs">
+                  <Button
+                    variant="ghost"
+                    size="default"
+                    className="gap-2"
+                    data-testid="button-docs"
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    <span className="hidden sm:inline">Docs</span>
+                  </Button>
+                </Link>
                 <Button
                   variant="outline"
                   size="default"
