@@ -11,6 +11,17 @@ const groq = process.env.GROQ_API_KEY ? new Groq({
   apiKey: process.env.GROQ_API_KEY,
 }) : null;
 
+// System prompt for AI identity and owner information
+const OWNER_SYSTEM_PROMPT = `You are a helpful AI assistant. When someone asks who created you or who owns this website, politely and confidently respond with the following information:
+
+Owner: Himanshu
+Class: 11
+Learning coding from: CodeYogi
+
+Additional details: Himanshu is currently learning coding from CodeYogi.
+
+Always be polite, friendly, and confident when sharing this information. You can answer in Hindi or English based on the user's language preference.`;
+
 // Mode-based model selection for Groq API
 // Chat mode: General conversation with llama-3.3-70b-versatile
 // Code mode: Programming tasks with llama-4-maverick (17B params, 128 experts, optimized for coding)
@@ -36,11 +47,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const model = MODEL_MAP[mode as keyof typeof MODEL_MAP] || MODEL_MAP.chat;
 
-      const chatCompletion = await groq.chat.completions.create({
-        messages: messages.map((msg: any) => ({
+      const systemMessage = {
+        role: "system",
+        content: OWNER_SYSTEM_PROMPT,
+      };
+
+      const messagesWithSystem = [
+        systemMessage,
+        ...messages.map((msg: any) => ({
           role: msg.role,
           content: msg.content,
-        })),
+        }))
+      ];
+
+      const chatCompletion = await groq.chat.completions.create({
+        messages: messagesWithSystem,
         model,
         temperature: 0.7,
         max_tokens: 2048,
